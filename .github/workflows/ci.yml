@@ -1,0 +1,96 @@
+# .github/workflows/ci.yml
+name: LA_test CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: eng_deu_vocab
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      php-apache:
+        image: php:8.2-apache
+        volumes:
+          # Mount backend PHP files: Now accessible via http://localhost/api/
+          - ${{ github.workspace }}/backend/api:/var/www/html/api
+          # Mount frontend static files: Accessible via http://localhost/frontend/
+          - ${{ github.workspace }}/frontend:/var/www/html/frontend
+        ports:
+          - 80:80
+        depends-on:
+          - mysql
+        environment:
+          DB_HOST: mysql
+          DB_USER: root
+          DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_NAME: eng_deu_vocab
+        options: >-
+          --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1" # Updated path
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'maven'
+
+    - name: Install Playwright Browsers
+      # Navigate to the correct directory for maven
+      run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
+
+    - name: Wait for services to be healthy
+      run: |
+        echo "Waiting for MySQL service..."
+        timeout 60s bash -c 'until curl --silent -f http://localhost:3306; do echo -n "."; sleep 1; done'
+        echo "MySQL service is available!"
+
+        echo "Waiting for PHP-Apache service..."
+        timeout 60s bash -c 'until curl --fail http://localhost/api/get-word.php || exit 1; do echo -n "."; sleep 1; done' # Updated path
+        echo "PHP-Apache service is available!"
+
+    - name: Prepare Database Schema and Data
+      run: |
+        MYSQL_CONTAINER_ID=$(docker ps -q -f "name=mysql" -q)
+        echo "MySQL container ID: $MYSQL_CONTAINER_ID"
+        docker exec "$MYSQL_CONTAINER_ID" mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" < database/schema.sql
+        docker exec "$MYSQL_CONTAINER_ID" mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" eng_deu_vocab < database/seed_data.sql
+      shell: bash
+
+    - name: Run Playwright Tests
+      run: |
+        # Update Maven command to point to the new pom.xml location
+        # Update Playwright paths to match the new API and frontend service paths
+        mvn -f tests/java/pom.xml test \
+          -Dfrontend.base.path=/frontend/ \
+          -Dapi.base.path=/api/ # Updated API base path
+
+    - name: Upload Test Reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-test-results
+        path: tests/java/target/surefire-reports # Updated path
