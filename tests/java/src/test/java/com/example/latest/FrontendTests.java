@@ -8,10 +8,9 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Tracing;
 import com.microsoft.playwright.Locator; // Import Locator for Locator.WaitForOptions
 import com.microsoft.playwright.assertions.PlaywrightAssertions; // Correct import for Playwright assertions
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.*; // Import JUnit Jupiter Assertions
 import java.nio.file.Paths;
 // We don't need java.util.regex.Pattern if we're doing an exact title match.
-// If you want to use regex for title, keep this import and adjust the testPageTitle assertion.
 
 public class FrontendTests {
     static Playwright playwright;
@@ -68,9 +67,6 @@ public class FrontendTests {
     void testInitialWordDisplay() {
         // The element exists but is initially empty, content loads via JS
         // We already added page.waitForSelector in @BeforeEach, so it should be visible now.
-        // Get the actual text from the element after it's loaded.
-        String initialEnglishWord = page.locator("div.word-pair p.english-word").textContent();
-        // Assert that it's not empty and matches an expected initial word from your seed data
         // (Assuming "Hello" is indeed the first word from your database based on seed_data.sql)
         PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
     }
@@ -86,9 +82,9 @@ public class FrontendTests {
 
         // Wait for the text to change (meaning a new word has loaded)
         // This is a more robust way to wait for dynamic content change
-        // Correct usage of Locator.WaitForOptions
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo(initialEnglishWord);
+        // Assert that the text is NOT the initial English word
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).not().hasText(initialEnglishWord);
     }
 
     @Test
@@ -120,7 +116,7 @@ public class FrontendTests {
         page.locator("button:has-text('Next Word')").click();
         // Wait for the English word to change
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo("Hello");
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).not().hasText("Hello");
         PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).not().isVisible(); // German word should be hidden again
     }
 
@@ -135,15 +131,17 @@ public class FrontendTests {
         // Wait for the word to change
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
         String secondWord = page.locator("div.word-pair p.english-word").textContent();
-        PlaywrightAssertions.assertThat(secondWord).isNotEqualTo(firstWord);
+        // Use JUnit's Assertions for String comparisons
+        org.junit.jupiter.api.Assertions.assertNotEquals(firstWord, secondWord);
 
         page.locator("button:has-text('Next Word')").click();
 
         // Wait for the word to change again
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
         String thirdWord = page.locator("div.word-pair p.english-word").textContent();
-        PlaywrightAssertions.assertThat(thirdWord).isNotEqualTo(secondWord);
-        PlaywrightAssertions.assertThat(thirdWord).isNotEqualTo(firstWord);
+        // Use JUnit's Assertions for String comparisons
+        org.junit.jupiter.api.Assertions.assertNotEquals(secondWord, thirdWord);
+        org.junit.jupiter.api.Assertions.assertNotEquals(firstWord, thirdWord);
     }
 
     @Test
