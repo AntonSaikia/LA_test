@@ -18,7 +18,8 @@ public class FrontendTests {
     @BeforeAll
     static void launchBrowser() {
         playwright = Playwright.create();
-        browser = playwright.chromium.launch(new BrowserType.LaunchOptions().setHeadless(true));
+        // FIX 1: Change playwright.chromium to playwright.chromium()
+        browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
     }
 
     @AfterAll
@@ -70,8 +71,8 @@ public class FrontendTests {
                              Map.of("selector", "div.word-pair p.english-word", "initialText", initialEnglishWord));
 
 
-        // Assert that the English word has changed
-        assertThat(page.locator("div.word-pair p.english-word")).doesNotHaveText(initialEnglishWord);
+        // FIX 2: Change doesNotHaveText to not().hasText()
+        assertThat(page.locator("div.word-pair p.english-word")).not().hasText(initialEnglishWord);
     }
 
     @Test
@@ -115,8 +116,8 @@ public class FrontendTests {
                                     "initialEnglishText", currentEnglishWord));
 
 
-        // Verify new state
-        assertThat(page.locator("div.word-pair p.english-word")).doesNotHaveText(currentEnglishWord);
+        // FIX 3: Change doesNotHaveText to not().hasText()
+        assertThat(page.locator("div.word-pair p.english-word")).not().hasText(currentEnglishWord);
         assertThat(page.locator("div.word-pair p.german-word")).isHidden();
     }
 
