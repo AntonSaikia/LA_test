@@ -32,7 +32,7 @@ public class FrontendTests {
         // Use browser.newPage() to create a new page for each test
         page = browser.newPage();
         // Base URL for the application
-        page.navigate("http://localhost:8080");
+        page.navigate("http://localhost/frontend);
     }
 
     @AfterEach
