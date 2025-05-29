@@ -10,20 +10,21 @@ on:
   workflow_dispatch: # Allow manual triggering
 
 jobs:
-  build: # Renamed from 'test' to 'build' for clarity, as it builds and tests
-    runs-on: ubuntu-latest # Using ubuntu-latest as it's generally stable
+  build:
+    runs-on: ubuntu-latest
 
     services:
-      # MySQL service: Will be accessible at hostname 'mysql' from other services or 'host.docker.internal' from steps
       mysql:
-        image: mysql:8.0 # Sticking to 8.0 as per your previous working version
+        image: mysql:8.0
+        # Pass environment variables directly within the 'env' block.
+        # Secrets should be directly accessible here.
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }} # Use secrets for passwords!
-          MYSQL_DATABASE: eng_deu_vocab # Use your correct database name
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }} # This should work directly
+          MYSQL_DATABASE: eng_deu_vocab
         ports:
           - 3306:3306
-        options: >- # Correct syntax for multi-line options
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${{ secrets.MYSQL_ROOT_PASSWORD }}"
+        options: >- # Use the correct options syntax for multi-line commands
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -p$MYSQL_ROOT_PASSWORD" # Reference env var in health check
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -40,15 +41,13 @@ jobs:
           cache: 'maven'
 
       - name: Install Playwright Browsers
-        # Run from the correct directory for Playwright tests
         run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
 
       - name: Wait for MySQL service
         run: |
           echo "Waiting for MySQL service to be ready..."
-          for i in $(seq 1 60); do # Up to 60 seconds
+          for i in $(seq 1 60); do
             # Use 'nc -z' to check if the port is open on the service host
-            # 'mysql' is the hostname for the mysql service defined in 'services'
             if nc -z mysql 3306; then
               echo "MySQL is up!"
               break
@@ -56,25 +55,18 @@ jobs:
             echo -n "."
             sleep 1
           done
-          echo "" # Newline after dots
-          # Fail if MySQL didn't start within the timeout
+          echo ""
           nc -z mysql 3306 || { echo "MySQL service failed to start!"; exit 1; }
 
-
-      # --- Database Schema and Data Preparation (after MySQL is up) ---
-      # Execute schema.sql and seed_data.sql directly against the MySQL service
       - name: Prepare Database Schema and Data
         run: |
-          # The 'mysql' hostname works directly in the job steps too, as it's part of the same network
+          # Use the 'mysql' hostname for the service, and correctly reference the secret
           echo "Applying database schema..."
           mysql -h mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" < database/schema.sql
           echo "Seeding database with initial data..."
           mysql -h mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" eng_deu_vocab < database/seed_data.sql
           echo "Database prepared."
 
-      # --- Start PHP-Apache container (similar to your previous working version) ---
-      # This runs the PHP-Apache container as a sibling to the main job,
-      # and uses host.docker.internal to connect to the MySQL service on the host.
       - name: Start PHP-Apache container
         run: |
           echo "Starting PHP-Apache container..."
@@ -93,13 +85,11 @@ jobs:
         run: |
           echo "Waiting for PHP-Apache to be reachable via HTTP on localhost:80..."
           for i in $(seq 1 60); do
-            # Use curl to check a known API endpoint for a 200 OK
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/get_words.php)
             if [ "$HTTP_CODE" -eq 200 ]; then
               echo "PHP-Apache /api/get_words.php is reachable ($HTTP_CODE)."
-              # Optionally, check for content in the response too, if you want
               RESPONSE=$(curl -s http://localhost/api/get_words.php)
-              if echo "$RESPONSE" | grep -q "Hello"; then
+              if echo "$RESPONSE" | grep -q "Hello"; then # Assuming "Hello" is the first expected word
                 echo "API returned expected content."
                 break
               fi
@@ -107,19 +97,16 @@ jobs:
             echo -n "."
             sleep 1
           done
-          echo "" # Newline after dots
+          echo ""
           curl --fail http://localhost/api/get_words.php || { echo "PHP-Apache API failed to respond with expected content!"; exit 1; }
           echo "All services are ready for Playwright tests."
 
-
       - name: Run Playwright Tests
         run: |
-          # Assuming FrontendTests.java uses http://localhost/frontend/ and http://localhost/api/
           mvn -f tests/java/pom.xml test \
             -Dfrontend.base.path=/frontend/ \
             -Dapi.base.path=/api/
 
-      # --- Upload Playwright Traces and Test Reports ---
       - name: Upload Playwright traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,18 +120,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-test-results
-          path: tests/java/target/surefire-reports/ # Collect Surefire reports
+          path: tests/java/target/surefire-reports/
 
-      # --- Optional: Collect and Upload Docker Container Logs ---
-      # Useful for debugging if tests fail, but services appear "ready"
       - name: Collect Docker container logs
         if: always()
         run: |
           echo "Collecting logs for PHP-Apache container..."
           docker logs php-apache > php-apache-logs.txt || echo "php-apache container logs not found."
           echo "Collecting logs for MySQL service container..."
-          # Find the actual service container name, which often includes a random suffix
-          MYSQL_SVC_CONTAINER_ID=$(docker ps -aq --filter "name=build_mysql")
+          MYSQL_SVC_CONTAINER_ID=$(docker ps -aq --filter "name=build_mysql") # Assuming this name structure
           if [ -n "$MYSQL_SVC_CONTAINER_ID" ]; then
             docker logs $MYSQL_SVC_CONTAINER_ID > mysql-service-logs.txt
           else
