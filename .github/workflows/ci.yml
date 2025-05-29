@@ -39,6 +39,7 @@ jobs:
 
     - name: Install required dependencies for Playwright
       run: |
+	sudo sed -i 's|http://.*.ubuntu.com|http://archive.ubuntu.com|g' /etc/apt/sources.list
         sudo apt-get update
         sudo apt-get install -y \
           libasound2 \
