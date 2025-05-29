@@ -37,6 +37,43 @@ jobs:
         java-version: '17'
         cache: 'maven'
 
+    - name: Install required dependencies for Playwright
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libasound2 \
+          libatk-bridge2.0-0 \
+          libatk1.0-0 \
+          libcups2 \
+          libdbus-1-3 \
+          libdrm2 \
+          libgbm1 \
+          libgtk-3-0 \
+          libnspr4 \
+          libnss3 \
+          libx11-xcb1 \
+          libxcomposite1 \
+          libxdamage1 \
+          libxrandr2 \
+          xdg-utils \
+          libxshmfence1 \
+          libxss1 \
+          libasound2 \
+          fonts-liberation \
+          libappindicator3-1 \
+          libffi8 \
+          wget \
+          curl \
+          ca-certificates \
+          libx264-dev \
+          libglib2.0-0 \
+          libjpeg-dev \
+          libvpx-dev
+
+    - name: Install Playwright Browsers
+      run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
+
+
     - name: Install Playwright Browsers
       run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
 
