@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # <--- CHANGE THIS LINE!
 
     services:
       mysql:
@@ -37,7 +37,6 @@ jobs:
         java-version: '17'
         cache: 'maven'
 
-    # This is the ONLY Playwright installation step needed.
     - name: Install Playwright Browsers
       run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
 
@@ -69,7 +68,7 @@ jobs:
       run: |
         echo "Waiting for PHP-Apache..."
         for i in {1..60}; do
-          if curl --fail http://localhost/api/get_words.php; then # Note: This was 'get_words.php' in your last successful code, double check your PHP file name
+          if curl --fail http://localhost/api/get_words.php; then
             echo "PHP-Apache is up!"
             break
           fi
