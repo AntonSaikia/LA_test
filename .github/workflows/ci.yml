@@ -16,32 +16,32 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }} # This is correct for passing env vars to the container
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           MYSQL_DATABASE: eng_deu_vocab
         ports:
           - 3306:3306
-        options: >- # Health check to wait for DB to be ready
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${MYSQL_ROOT_PASSWORD}" # <--- CORRECTED: Use env var directly here
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${MYSQL_ROOT_PASSWORD}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
 
       php-apache:
         image: php:8.2-apache
-        # --- CORRECTED: depends-on moved to this level ---
-        depends-on: # <--- THIS IS THE CORRECT INDENTATION FOR depends-on
+        # --- ALL THESE KEYS SHOULD BE AT THE SAME INDENTATION LEVEL, DIRECTLY UNDER 'php-apache' ---
+        depends-on: # <--- CORRECT INDENTATION for depends-on
           - mysql
-        volumes:
+        volumes:    # <--- CORRECT INDENTATION for volumes
           - ${{ github.workspace }}/backend/api:/var/www/html/api
           - ${{ github.workspace }}/frontend:/var/www/html/frontend
-        ports:
+        ports:      # <--- CORRECT INDENTATION for ports
           - 80:80
-        environment:
+        environment: # <--- CORRECT INDENTATION for environment
           DB_HOST: mysql
           DB_USER: root
           DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_NAME: eng_deu_vocab
-        options: >-
+        options: >- # <--- CORRECT INDENTATION for options
           --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1"
           --health-interval 10s
           --health-timeout 5s
