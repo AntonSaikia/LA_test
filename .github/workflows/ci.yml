@@ -6,7 +6,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   test:
@@ -16,39 +16,39 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }} # This is correct for passing env vars to the container
           MYSQL_DATABASE: eng_deu_vocab
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${{ secrets.MYSQL_ROOT_PASSWORD }}"
+        options: >- # Health check to wait for DB to be ready
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -p${MYSQL_ROOT_PASSWORD}" # <--- CORRECTED: Use env var directly here
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
 
       php-apache:
         image: php:8.2-apache
+        # --- CORRECTED: depends-on moved to this level ---
+        depends-on: # <--- THIS IS THE CORRECT INDENTATION FOR depends-on
+          - mysql
         volumes:
-          # Mount backend PHP files: Now accessible via http://localhost/api/
           - ${{ github.workspace }}/backend/api:/var/www/html/api
-          # Mount frontend static files: Accessible via http://localhost/frontend/
           - ${{ github.workspace }}/frontend:/var/www/html/frontend
         ports:
           - 80:80
-        depends-on:
-          - mysql
         environment:
           DB_HOST: mysql
           DB_USER: root
           DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_NAME: eng_deu_vocab
         options: >-
-          --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1" # Updated path
+          --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     steps:
+    # ... (rest of your steps remain the same) ...
     - uses: actions/checkout@v4
 
     - name: Set up JDK 17
@@ -59,7 +59,6 @@ jobs:
         cache: 'maven'
 
     - name: Install Playwright Browsers
-      # Navigate to the correct directory for maven
       run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
 
     - name: Wait for services to be healthy
@@ -69,7 +68,7 @@ jobs:
         echo "MySQL service is available!"
 
         echo "Waiting for PHP-Apache service..."
-        timeout 60s bash -c 'until curl --fail http://localhost/api/get-word.php || exit 1; do echo -n "."; sleep 1; done' # Updated path
+        timeout 60s bash -c 'until curl --fail http://localhost/api/get-word.php || exit 1; do echo -n "."; sleep 1; done'
         echo "PHP-Apache service is available!"
 
     - name: Prepare Database Schema and Data
@@ -82,15 +81,13 @@ jobs:
 
     - name: Run Playwright Tests
       run: |
-        # Update Maven command to point to the new pom.xml location
-        # Update Playwright paths to match the new API and frontend service paths
         mvn -f tests/java/pom.xml test \
           -Dfrontend.base.path=/frontend/ \
-          -Dapi.base.path=/api/ # Updated API base path
+          -Dapi.base.path=/api/
 
     - name: Upload Test Reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: playwright-test-results
-        path: tests/java/target/surefire-reports # Updated path
+        path: tests/java/target/surefire-reports
