@@ -26,22 +26,23 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      php-apache:
+      php-apache: # This is the service name
         image: php:8.2-apache
-        # --- ALL THESE KEYS SHOULD BE AT THE SAME INDENTATION LEVEL, DIRECTLY UNDER 'php-apache' ---
-        depends-on: # <--- CORRECT INDENTATION for depends-on
+        # All these properties should be indented 2 spaces further than 'php-apache:'
+        # and be at the same level as 'image:'.
+        depends-on: # <--- THIS IS THE CORRECT INDENTATION for depends-on
           - mysql
-        volumes:    # <--- CORRECT INDENTATION for volumes
+        volumes:    # <--- THIS IS THE CORRECT INDENTATION for volumes
           - ${{ github.workspace }}/backend/api:/var/www/html/api
           - ${{ github.workspace }}/frontend:/var/www/html/frontend
-        ports:      # <--- CORRECT INDENTATION for ports
+        ports:      # <--- THIS IS THE CORRECT INDENTATION for ports
           - 80:80
-        environment: # <--- CORRECT INDENTATION for environment
+        environment: # <--- THIS IS THE CORRECT INDENTATION for environment
           DB_HOST: mysql
           DB_USER: root
           DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_NAME: eng_deu_vocab
-        options: >- # <--- CORRECT INDENTATION for options
+        options: >- # <--- THIS IS THE CORRECT INDENTATION for options
           --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1"
           --health-interval 10s
           --health-timeout 5s
