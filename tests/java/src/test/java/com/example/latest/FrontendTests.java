@@ -1,26 +1,24 @@
-package com.example.latest; // Updated package name
+package com.example.latest;
 
 import com.microsoft.playwright.*;
-import com.microsoft.playwright.options.WaitUntilState;
+import com.microsoft.playwright.options.*;
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import org.junit.jupiter.api.*;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import java.util.regex.Pattern;
+import java.util.List;
+import java.util.Map; // Import Map for passing arguments
 
-public class FrontendTests { // Updated class name
-
+public class FrontendTests {
     static Playwright playwright;
     static Browser browser;
-    Page page;
 
-    // Base paths for frontend and API within the CI environment (Apache paths)
-    private final String FRONTEND_BASE_PATH = System.getProperty("frontend.base.path", "/frontend/");
-    private final String API_BASE_PATH = System.getProperty("api.base.path", "/api/"); // Updated API path
+    // New: Declare a Page object that can be accessed by all tests
+    Page page;
 
     @BeforeAll
     static void launchBrowser() {
         playwright = Playwright.create();
-        browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+        browser = playwright.chromium.launch(new BrowserType.LaunchOptions().setHeadless(true));
     }
 
     @AfterAll
@@ -30,101 +28,127 @@ public class FrontendTests { // Updated class name
 
     @BeforeEach
     void createContextAndPage() {
-        BrowserContext context = browser.newContext();
-        page = context.newPage();
+        // Use browser.newPage() to create a new page for each test
+        page = browser.newPage();
+        // Base URL for the application
+        page.navigate("http://localhost:8080");
     }
 
     @AfterEach
-    void closeContext() {
-        if (page != null) {
-            page.context().close();
+    void closePage() {
+        page.close();
+    }
+
+    @Test
+    void testPageTitle() {
+        assertThat(page).hasTitle(Pattern.compile("Language App"));
+    }
+
+    @Test
+    void testInitialWordDisplay() {
+        // Assert that the English word "Hello" is displayed
+        assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
+        // Assert that the German word "Hallo" is displayed
+        assertThat(page.locator("div.word-pair p.german-word")).hasText("Hallo");
+    }
+
+    @Test
+    void testNextWordButton() {
+        // Get the initial English word
+        String initialEnglishWord = page.locator("div.word-pair p.english-word").textContent();
+
+        // Click the "Next Word" button
+        page.click("button:has-text('Next Word')");
+
+        // Wait for the English word to change
+        // Using waitForFunction to wait until the text content is different from the initial word
+        // Pass a Map as the argument for the JavaScript function
+        page.waitForFunction("({ selector, initialText }) => {" +
+                             "  const element = document.querySelector(selector);" +
+                             "  return element && element.textContent !== initialText;" +
+                             "}",
+                             Map.of("selector", "div.word-pair p.english-word", "initialText", initialEnglishWord));
+
+
+        // Assert that the English word has changed
+        assertThat(page.locator("div.word-pair p.english-word")).doesNotHaveText(initialEnglishWord);
+    }
+
+    @Test
+    void testShowAnswerButton() {
+        // Ensure the German word is initially hidden or not fully visible
+        assertThat(page.locator("div.word-pair p.german-word")).isHidden();
+
+        // Click the "Show Answer" button
+        page.click("button:has-text('Show Answer')");
+
+        // Assert that the German word is now visible
+        assertThat(page.locator("div.word-pair p.german-word")).isVisible();
+    }
+
+    @Test
+    void testCombinedFunctionality() {
+        // Verify initial state
+        assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
+        assertThat(page.locator("div.word-pair p.german-word")).isHidden();
+
+        // Click "Show Answer"
+        page.click("button:has-text('Show Answer')");
+        assertThat(page.locator("div.word-pair p.german-word")).isVisible();
+        assertThat(page.locator("div.word-pair p.german-word")).hasText("Hallo");
+
+        // Store current English word
+        String currentEnglishWord = page.locator("div.word-pair p.english-word").textContent();
+
+        // Click "Next Word"
+        page.click("button:has-text('Next Word')");
+
+        // Wait for English word to change, and German word to become hidden again
+        page.waitForFunction("({ englishSelector, germanSelector, initialEnglishText }) => {" +
+                             "  const englishWordElement = document.querySelector(englishSelector);" +
+                             "  const germanWordElement = document.querySelector(germanSelector);" +
+                             "  return englishWordElement && englishWordElement.textContent !== initialEnglishText &&" +
+                             "         germanWordElement && getComputedStyle(germanWordElement).visibility === 'hidden';" +
+                             "}",
+                             Map.of("englishSelector", "div.word-pair p.english-word",
+                                    "germanSelector", "div.word-pair p.german-word",
+                                    "initialEnglishText", currentEnglishWord));
+
+
+        // Verify new state
+        assertThat(page.locator("div.word-pair p.english-word")).doesNotHaveText(currentEnglishWord);
+        assertThat(page.locator("div.word-pair p.german-word")).isHidden();
+    }
+
+    @Test
+    void testWordProgression() {
+        // Assuming there are at least 3 words: Hello, World, Goodbye
+        String[] expectedEnglishWords = {"Hello", "World", "Goodbye"};
+
+        for (int i = 0; i < expectedEnglishWords.length; i++) {
+            String initialEnglishWord = page.locator("div.word-pair p.english-word").textContent();
+            assertThat(page.locator("div.word-pair p.english-word")).hasText(expectedEnglishWords[i]);
+
+            if (i < expectedEnglishWords.length - 1) {
+                // Click next word
+                page.click("button:has-text('Next Word')");
+                // Wait for the word to change
+                page.waitForFunction("({ selector, initialText }) => {" +
+                                     "  const element = document.querySelector(selector);" +
+                                     "  return element && element.textContent !== initialText;" +
+                                     "}",
+                                     Map.of("selector", "div.word-pair p.english-word", "initialText", initialEnglishWord));
+            }
         }
     }
 
     @Test
-    @DisplayName("Should display word correctly when fetched successfully")
-    void testSuccessfulWordFetchAndDisplay() {
-        page.navigate("http://localhost" + FRONTEND_BASE_PATH, new Page.NavigateOptions().setWaitUntil(WaitUntilState.NETWORKIDLE));
-
-        Locator englishWord = page.locator("data-testid=english-word");
-        Locator germanWord = page.locator("data-testid=german-word");
-
-        assertTrue(englishWord.isVisible(), "English word element should be visible");
-        assertTrue(germanWord.isVisible(), "German word element should be visible");
-        assertTrue(!englishWord.textContent().isEmpty(), "English word should not be empty");
-        assertTrue(!germanWord.textContent().isEmpty(), "German word should not be empty");
-
-        System.out.println("Fetched English Word: " + englishWord.textContent());
-        System.out.println("Fetched German Word: " + germanWord.textContent());
-    }
-
-    @Test
-    @DisplayName("Should display 'No data found' message when API returns empty")
-    void testNoDataFoundScenario() {
-        // Intercept the API call and return the "No data found" message
-        // Updated to new API path and filename: /api/get-word.php
-        page.route("**/api/get-word.php", route -> {
-            route.fulfill(new Route.FulfillOptions()
-                    .setStatus(200)
-                    .setContentType("application/json")
-                    .setBody("{\"message\": \"No data found\"}"));
-        });
-
-        page.navigate("http://localhost" + FRONTEND_BASE_PATH, new Page.NavigateOptions().setWaitUntil(WaitUntilState.NETWORKIDLE));
-
-        Locator errorMessage = page.locator("data-testid=error-message");
-        assertTrue(errorMessage.isVisible(), "Error message should be visible");
-        assertTrue(errorMessage.textContent().contains("No data found"), "Error message text should contain 'No data found'");
-
-        assertFalse(page.locator("data-testid=english-word").isVisible(), "English word should not be visible");
-        assertFalse(page.locator("data-testid=german-word").isVisible(), "German word should not be visible");
-    }
-
-    @Test
-    @DisplayName("Should display error message on network failure")
-    void testNetworkErrorScenario() {
-        // Intercept the API call and abort it to simulate network error
-        // Updated to new API path and filename: /api/get-word.php
-        page.route("**/api/get-word.php", Route::abort);
-
-        page.navigate("http://localhost" + FRONTEND_BASE_PATH, new Page.NavigateOptions().setWaitUntil(WaitUntilState.NETWORKIDLE));
-
-        Locator errorMessage = page.locator("data-testid=error-message");
-        assertTrue(errorMessage.isVisible(), "Error message should be visible on network failure");
-        assertTrue(errorMessage.textContent().contains("Failed to load words"), "Error message text should contain 'Failed to load words'");
-
-        assertFalse(page.locator("data-testid=english-word").isVisible(), "English word should not be visible");
-        assertFalse(page.locator("data-testid=german-word").isVisible(), "German word should not be visible");
-    }
-
-    @Test
-    @DisplayName("Should fetch a new word on refresh button click")
-    void testRefreshFunctionality() {
-        page.navigate("http://localhost" + FRONTEND_BASE_PATH, new Page.NavigateOptions().setWaitUntil(WaitUntilState.NETWORKIDLE));
-
-        Locator englishWordLocator = page.locator("data-testid=english-word");
-        Locator germanWordLocator = page.locator("data-testid=german-word");
-        Locator refreshButton = page.locator("data-testid=new-word-button");
-
-        assertTrue(englishWordLocator.isVisible(), "Initial English word should be visible");
-        assertTrue(germanWordLocator.isVisible(), "Initial German word should be visible");
-        String initialEnglishWord = englishWordLocator.textContent();
-        String initialGermanWord = germanWordLocator.textContent();
-
-        refreshButton.click();
-
-        // Wait for the new word to load, by waiting for the text to change
-        page.waitForFunction("selector => document.querySelector(selector) && document.querySelector(selector).textContent !== arguments[0]",
-                     "div.word-pair p.english-word", // Pass the actual selector string here
-                     initialEnglishWord);
-
-        String newEnglishWord = englishWordLocator.textContent();
-        String newGermanWord = germanWordLocator.textContent();
-
-        System.out.println("Initial English: " + initialEnglishWord + ", New English: " + newEnglishWord);
-        System.out.println("Initial German: " + initialGermanWord + ", New German: " + newGermanWord);
-
-        assertNotEquals(initialEnglishWord, newEnglishWord, "English word should change after refresh");
-        assertNotEquals(initialGermanWord, newGermanWord, "German word should change after refresh");
+    void testElementVisibilityOnLoad() {
+        // Assert that the "Next Word" button is visible
+        assertThat(page.locator("button:has-text('Next Word')")).isVisible();
+        // Assert that the "Show Answer" button is visible
+        assertThat(page.locator("button:has-text('Show Answer')")).isVisible();
+        // Assert that the English word element is visible
+        assertThat(page.locator("div.word-pair p.english-word")).isVisible();
     }
 }
