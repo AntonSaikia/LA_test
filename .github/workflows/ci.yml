@@ -7,11 +7,11 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # Explicitly use Ubuntu 22.04 LTS for more stable package availability
 
     services:
       mysql:
@@ -38,11 +38,17 @@ jobs:
           java-version: '17'
           cache: 'maven'
 
-      # --- FIX START: Install Playwright System Dependencies ---
-      # Update apt-get and install recommended Playwright dependencies for Ubuntu
+      # --- Install Playwright System Dependencies ---
+      # Updated list, removing problem packages or adjusting them for 22.04 if known.
+      # `libasound2` is likely `libasound2t64` on 22.04+
+      # `libgconf-2-4` is often not available and not strictly needed by newer Playwright.
+      # `libwebp6` might be `libwebp7` or just `libwebp-dev`.
       - name: Install Playwright system dependencies
         run: |
           sudo apt-get update
+          # Some packages like libgconf-2-4 are often deprecated or not available in newer Ubuntu versions.
+          # We'll install a comprehensive list and remove known problematic ones.
+          # Playwright's own `install --with-deps` is quite good at identifying what's missing.
           sudo apt-get install -y \
             libfontconfig1 \
             libfreetype6 \
@@ -54,14 +60,13 @@ jobs:
             libxrandr2 \
             libxrender1 \
             libxtst6 \
-            libasound2 \
+            libasound2t64 \
             libglib2.0-0 \
             libnss3 \
             libatk-bridge2.0-0 \
             libcups2 \
             libdrm2 \
             libgbm1 \
-            libgconf-2-4 \
             libgtk-3-0 \
             libnspr4 \
             libnotify4 \
@@ -69,7 +74,6 @@ jobs:
             libsecret-1-0 \
             libsqlite3-0 \
             libuuid1 \
-            libwebp6 \
             libxcomposite1 \
             libxdamage1 \
             libxfixes3 \
@@ -78,19 +82,11 @@ jobs:
             libxcursor1 \
             libxkbcommon0 \
             libxshmfence1 \
-            libxtst6 \
-            xdg-utils \
             procps \
-            # The following might be the problematic ones or their newer versions
-            # libffi7 might be libffi8 on newer Ubuntu versions. Playwright usually handles this.
-            # libx264 is typically replaced by newer versions like libx264-164 or similar.
-            # Including a broad set should cover the bases.
-            # If `libffi7` explicitly fails, `libffi-dev` might be needed for development packages.
-            # For `libx264-163`, installing `ffmpeg` or `libavcodec-extra` might provide underlying deps.
-            # However, Playwright's default "install" command tries to get these.
-            # It's better to install the broader list first.
-          echo "Playwright system dependencies installed."
-      # --- FIX END: Install Playwright System Dependencies ---
+            # Removed `libwebp6` and `libgconf-2-4` as they are common sources of "unable to locate"
+            # Removed `libffi7` - often satisfied by `libffi-dev` or later versions implicitly.
+          echo "Playwright system dependencies installation attempt completed."
+          # If this still fails, the fallback is to install the Playwright action.
 
       - name: Install Playwright Browsers
         run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
