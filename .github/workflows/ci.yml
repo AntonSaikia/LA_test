@@ -39,7 +39,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_NAME: eng_deu_vocab
         options: >-
-          --health-cmd "curl --fail http://localhost/api/get-word.php || exit 1"
+          --health-cmd "curl --fail http://localhost/api/get_words.php || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -65,7 +65,7 @@ jobs:
         echo "MySQL service is available!"
 
         echo "Waiting for PHP-Apache service..."
-        timeout 60s bash -c 'until curl --fail http://localhost/api/get-word.php || exit 1; do echo -n "."; sleep 1; done'
+        timeout 60s bash -c 'until curl --fail http://localhost/api/get_words.php || exit 1; do echo -n "."; sleep 1; done'
         echo "PHP-Apache service is available!"
 
     - name: Prepare Database Schema and Data
