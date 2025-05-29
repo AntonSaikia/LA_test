@@ -5,12 +5,13 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.Tracing; // Add this import
-import com.microsoft.playwright.assertions.Assertions; // Add this import
+import com.microsoft.playwright.Tracing;
+import com.microsoft.playwright.Locator; // Import Locator for Locator.WaitForOptions
+import com.microsoft.playwright.assertions.PlaywrightAssertions; // Correct import for Playwright assertions
 import org.junit.jupiter.api.*;
-import java.nio.file.Paths; // Add this import
-import java.util.regex.Pattern; // Keep this import if you want regex for title, but exact match is fine.
-
+import java.nio.file.Paths;
+// We don't need java.util.regex.Pattern if we're doing an exact title match.
+// If you want to use regex for title, keep this import and adjust the testPageTitle assertion.
 
 public class FrontendTests {
     static Playwright playwright;
@@ -21,7 +22,8 @@ public class FrontendTests {
     @BeforeAll
     static void launchBrowser() {
         playwright = Playwright.create();
-        browser = playwright.chromium.launch(new BrowserType.LaunchOptions().setHeadless(true)); // Use headless for CI
+        // Correct way to access chromium
+        browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true)); // Use headless for CI
     }
 
     @AfterAll
@@ -59,7 +61,7 @@ public class FrontendTests {
     @Test
     void testPageTitle() {
         // Correct the expected title based on index.html
-        Assertions.assertThat(page).hasTitle("German Words");
+        PlaywrightAssertions.assertThat(page).hasTitle("German Words");
     }
 
     @Test
@@ -70,7 +72,7 @@ public class FrontendTests {
         String initialEnglishWord = page.locator("div.word-pair p.english-word").textContent();
         // Assert that it's not empty and matches an expected initial word from your seed data
         // (Assuming "Hello" is indeed the first word from your database based on seed_data.sql)
-        Assertions.assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
     }
 
     @Test
@@ -84,69 +86,70 @@ public class FrontendTests {
 
         // Wait for the text to change (meaning a new word has loaded)
         // This is a more robust way to wait for dynamic content change
+        // Correct usage of Locator.WaitForOptions
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        Assertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo(initialEnglishWord);
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo(initialEnglishWord);
     }
 
     @Test
     void testShowAnswerButton() {
         // Ensure the English word is loaded before interacting
         page.waitForSelector("div.word-pair p.english-word", new Page.WaitForSelectorOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        
+
         // Click the 'Show Answer' button
         page.locator("button:has-text('Show Answer')").click();
 
         // Check that the German word is now visible (it was likely empty or hidden before)
-        Assertions.assertThat(page.locator("div.word-pair p.german-word")).isVisible();
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).isVisible();
         // Assert the German word has some text (not empty)
-        Assertions.assertThat(page.locator("div.word-pair p.german-word")).not().hasText("");
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).not().hasText("");
     }
 
     @Test
     void testCombinedFunctionality() {
         // Ensure initial word is loaded
         page.waitForSelector("div.word-pair p.english-word", new Page.WaitForSelectorOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        Assertions.assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).hasText("Hello");
 
         // Click Show Answer
         page.locator("button:has-text('Show Answer')").click();
-        Assertions.assertThat(page.locator("div.word-pair p.german-word")).isVisible();
-        Assertions.assertThat(page.locator("div.word-pair p.german-word")).hasText("Hallo"); // Assuming "Hallo" is the German translation for "Hello" in your seed data
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).isVisible();
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).hasText("Hallo"); // Assuming "Hallo" is the German translation for "Hello" in your seed data
 
         // Click Next Word
         page.locator("button:has-text('Next Word')").click();
         // Wait for the English word to change
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        Assertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo("Hello");
-        Assertions.assertThat(page.locator("div.word-pair p.german-word")).not().isVisible(); // German word should be hidden again
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.english-word")).isNotEqualTo("Hello");
+        PlaywrightAssertions.assertThat(page.locator("div.word-pair p.german-word")).not().isVisible(); // German word should be hidden again
     }
 
     @Test
     void testWordProgression() {
         // Ensure initial word is loaded
         page.waitForSelector("div.word-pair p.english-word", new Page.WaitForSelectorOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-        
+
         String firstWord = page.locator("div.word-pair p.english-word").textContent();
         page.locator("button:has-text('Next Word')").click();
 
         // Wait for the word to change
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
         String secondWord = page.locator("div.word-pair p.english-word").textContent();
-        Assertions.assertThat(secondWord).isNotEqualTo(firstWord);
+        PlaywrightAssertions.assertThat(secondWord).isNotEqualTo(firstWord);
 
         page.locator("button:has-text('Next Word')").click();
-        
+
         // Wait for the word to change again
         page.locator("div.word-pair p.english-word").waitFor(new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
         String thirdWord = page.locator("div.word-pair p.english-word").textContent();
-        Assertions.assertThat(thirdWord).isNotEqualTo(secondWord);
-        Assertions.assertThat(thirdWord).isNotEqualTo(firstWord);
+        PlaywrightAssertions.assertThat(thirdWord).isNotEqualTo(secondWord);
+        PlaywrightAssertions.assertThat(thirdWord).isNotEqualTo(firstWord);
     }
 
     @Test
     void testElementVisibilityOnLoad() {
         // These buttons are always visible on load according to index.html
-        Assertions.assertThat(page.locator("button:has-text('Show Answer')")).isVisible();
-        Assertions.assertThat(page.locator("button:has-text('Next Word')")).isVisible();
+        PlaywrightAssertions.assertThat(page.locator("button:has-text('Show Answer')")).isVisible();
+        PlaywrightAssertions.assertThat(page.locator("button:has-text('Next Word')")).isVisible();
     }
 }
