@@ -115,7 +115,8 @@ public class FrontendTests { // Updated class name
 
         // Wait for the new word to load, by waiting for the text to change
         page.waitForFunction("selector => document.querySelector(selector) && document.querySelector(selector).textContent !== arguments[0]",
-                             englishWordLocator.selector(), initialEnglishWord);
+                     "div.word-pair p.english-word", // Pass the actual selector string here
+                     initialEnglishWord);
 
         String newEnglishWord = englishWordLocator.textContent();
         String newGermanWord = germanWordLocator.textContent();
