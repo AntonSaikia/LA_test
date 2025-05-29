@@ -21,7 +21,7 @@ jobs:
           MYSQL_DATABASE: eng_deu_vocab
         ports:
           - 3306:3306
-        options: >- # Correct syntax for multi-line options
+        options: >-
           --health-cmd "mysqladmin ping -h 127.0.0.1 -p$MYSQL_ROOT_PASSWORD"
           --health-interval 10s
           --health-timeout 5s
@@ -37,6 +37,60 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
+
+      # --- FIX START: Install Playwright System Dependencies ---
+      # Update apt-get and install recommended Playwright dependencies for Ubuntu
+      - name: Install Playwright system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libfontconfig1 \
+            libfreetype6 \
+            libharfbuzz0b \
+            libice6 \
+            libsm6 \
+            libx11-6 \
+            libxext6 \
+            libxrandr2 \
+            libxrender1 \
+            libxtst6 \
+            libasound2 \
+            libglib2.0-0 \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libgbm1 \
+            libgconf-2-4 \
+            libgtk-3-0 \
+            libnspr4 \
+            libnotify4 \
+            libpng16-16 \
+            libsecret-1-0 \
+            libsqlite3-0 \
+            libuuid1 \
+            libwebp6 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxi6 \
+            libxss1 \
+            libxcursor1 \
+            libxkbcommon0 \
+            libxshmfence1 \
+            libxtst6 \
+            xdg-utils \
+            procps \
+            # The following might be the problematic ones or their newer versions
+            # libffi7 might be libffi8 on newer Ubuntu versions. Playwright usually handles this.
+            # libx264 is typically replaced by newer versions like libx264-164 or similar.
+            # Including a broad set should cover the bases.
+            # If `libffi7` explicitly fails, `libffi-dev` might be needed for development packages.
+            # For `libx264-163`, installing `ffmpeg` or `libavcodec-extra` might provide underlying deps.
+            # However, Playwright's default "install" command tries to get these.
+            # It's better to install the broader list first.
+          echo "Playwright system dependencies installed."
+      # --- FIX END: Install Playwright System Dependencies ---
 
       - name: Install Playwright Browsers
         run: mvn -f tests/java/pom.xml exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install --with-deps"
